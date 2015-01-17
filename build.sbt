@@ -1,7 +1,8 @@
 
+version in LocalRootProject := "0.1-SNAPSHOT"
+
 lazy val commonSettings = Seq(
   organization := "pl.falcone",
-  version in ThisBuild := "0.1-SNAPSHOT",
   scalaVersion := "2.11.5"
 )
 
