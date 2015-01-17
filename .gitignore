@@ -1,0 +1,9 @@
+# Build output
+target/
+
+# IntelliJ project's files
+.idea/
+.idea_modules/
+
+# Others
+*~
