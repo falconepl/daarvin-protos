@@ -1,26 +1,16 @@
 
 sealed trait AgentMessage
 
-// Meeting
+case class MeetingRequest(energy: Int) extends AgentMessage
 
-sealed trait MeetingMessage extends AgentMessage
+case class CrossOverRequest(gen: IndexedSeq[Int]) extends AgentMessage
 
-case class MeetingRequest(energy: Int) extends MeetingMessage
+case class EnergyUpdate(delta: Int) extends AgentMessage
 
-case class MeetingResponse(energy: Int) extends MeetingMessage
+case class GenUpdate(gen: IndexedSeq[Int]) extends AgentMessage
 
-// Cross-over
+case object EnergyUpdateFailed extends AgentMessage
 
-sealed trait CrossOverMessage extends AgentMessage
+case object CrossOverSucceeded extends AgentMessage
 
-case class CrossOverRequest(gen: IndexedSeq[Int]) extends CrossOverMessage
-
-case class CrossOverResponse(gen: IndexedSeq[Int]) extends CrossOverMessage
-
-case object ReleaseCrossOverLock extends CrossOverMessage
-
-case object CrossOverCancel extends CrossOverMessage
-
-// Misc.
-
-case object Done extends AgentMessage
+case object CrossOverFailed extends AgentMessage

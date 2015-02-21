@@ -1,92 +1,54 @@
-import akka.actor.FSM
+import akka.actor.{Actor, ActorRef}
+import math.Probabilities._
 
-import scala.concurrent.duration._
+import scala.concurrent.Future
 
-abstract class Agent
-  extends FSM[AgentState, AgentData] with Initialization with Config with Behavior {
+abstract class Agent(region: ActorRef, specificGen: Option[IndexedSeq[Int]] = None)
+  extends Actor with Config with AgentBehavior {
 
-  startWith(Waiting, initializeData)
+  var energy = initEnergy
 
-  // Waiting
+  var gen = specificGen getOrElse initGen
 
-  when(Waiting, stateTimeout = 1 second) {
-    case Event(MeetingRequest(neighborEnergy), data: AgentData) =>
-      goto(ProcessMeetingRequest) using data.withNeighbor(sender).copy(
-        energy = energyAfterMeeting(data.energy, neighborEnergy)
-      )
-    case Event(MeetingResponse(neighborEnergy), data: AgentData) =>
-      stay using data.copy(
-        energy = energyAfterMeeting(data.energy, neighborEnergy)
-      )
-    case Event(CrossOverRequest(gen), data: AgentData) if aboveThold(data.energy) =>
-      goto(LockForCrossOverReceive) using data.withNeighbor(sender)
-    case Event(CrossOverResponse(neighborGen), data: AgentData) =>
-      goto(ProcessCrossOverApply) using data.withNeighborGen(sender, neighborGen).copy(
-        energy = energyAfterCrossOver(data.energy)
-      )
-    case Event(StateTimeout, _) =>
-      stay
+  override def preStart() = controlled { talk }
+
+  def receive = {
+    case EnergyUpdate(update) =>
+      energy = update
+      controlled { tryMutate orElse talk }
+
+    case GenUpdate(update) =>
+      gen = update
+      controlled { talk }
+
+    case CrossOverSucceeded =>
+      energy = crossOverEnergyUpdate
+      controlled { tryMutate orElse talk }
+
+    case EnergyUpdateFailed =>
+      controlled { tryMutate orElse talk }
+
+    case CrossOverFailed =>
+      controlled { tryMutate orElse talk }
   }
 
-  // Meeting
+  private def controlled(action: => Unit) =
+    if (aboveDeathThold) action
+    else context stop self
 
-  when(ProcessMeetingRequest) {
-    case Event(Done, data: AgentDataWithNeighbor) =>
-      goto(Waiting) using data.removeNeighbor
+  private def tryMutate = {
+    import context.dispatcher
+
+    mutateProbability chanceFor {
+      Future(mutate).onSuccess { case g => self ! GenUpdate(g) }
+    }
   }
 
-  // Cross-over
-
-  when(LockForCrossOverReceive, stateTimeout = 900 milliseconds) {
-    case Event(ReleaseCrossOverLock, data: AgentDataWithNeighbor) =>
-      goto(Waiting) using data.removeNeighbor.copy(
-        energy = energyAfterCrossOver(data.energy)
-      )
-    case Event(CrossOverCancel, data: AgentDataWithNeighbor) =>
-      goto(Waiting) using data.removeNeighbor
-    case Event(StateTimeout, data: AgentDataWithNeighbor) =>
-      goto(Waiting) using data.removeNeighbor
-  }
-
-  when(ProcessCrossOverApply) {
-    case Event(Done, data: AgentDataWithNeighborGen) =>
-      goto(Waiting) using data.removeNeighbor
-  }
-
-  // Transitions
-
-  onTransition {
-    case _ -> ProcessMeetingRequest =>
-      nextStateData match {
-        case AgentDataWithNeighbor(energy, _, neighbor) =>
-          neighbor ! MeetingResponse(energy)
-      }
-      self ! Done
-    case _ -> LockForCrossOverReceive =>
-      nextStateData match {
-        case AgentDataWithNeighbor(_, gen, neighbor) =>
-          neighbor ! CrossOverResponse(gen)
-      }
-      self ! Done
-    case _ -> ProcessCrossOverApply =>
-      nextStateData match {
-        case AgentDataWithNeighborGen(_, gen, neighbor, neighborGen) =>
-          neighbor ! ReleaseCrossOverLock
-          val newAgentGen = crossOver(gen, neighborGen)
-          val newAgentEnergy = energyForNewAgent
-        // TODO: Create new agent/actor
-      }
-      self ! Done
-    case _ -> Waiting =>
-    // TODO: Send meeting/cross-over request with certain probability
-  }
-
-  // Unhandled
-
-  whenUnhandled {
-    case Event(CrossOverResponse, _) =>
-      sender ! CrossOverCancel
-      stay
-  }
+  private def talk =
+    crossOverProbability chanceFor {
+      context.parent ! CrossOverRequest
+    } orElse {
+      context.parent ! MeetingRequest
+    }
 
 }
