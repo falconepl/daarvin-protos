@@ -5,10 +5,17 @@ trait AgentBehavior {
 
   var energy: Int
 
+  var fitness: Int
+
   /**
    * Energy value to set after cross-over action.
    */
   def crossOverEnergyUpdate: Int
+
+  /**
+   * Current fitness value to set.
+   */
+  def fitnessUpdate: Int
 
   /**
    * True if energy level is above a cross-over threshold. False otherwise.

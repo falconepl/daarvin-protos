@@ -12,8 +12,8 @@ abstract class Region extends Actor with Config with RegionBehavior with Require
     (1 to regionAgents).foreach { _ => context.actorOf(agentProps()) }
 
   def receive = {
-    case MeetingRequest(energy) =>
-      children += { (sender, MeetingInfo(sender, energy)) }
+    case MeetingRequest(fitness) =>
+      children += { (sender, MeetingInfo(sender, fitness)) }
       processPair (meetingAction)
     case CrossOverRequest(gen) =>
       children += { (sender, CrossOverInfo(sender, gen)) }
@@ -35,17 +35,19 @@ abstract class Region extends Actor with Config with RegionBehavior with Require
   private def meetingAction(agentA: MeetingInfo, agentB: MeetingInfo) = {
     import context.dispatcher
 
+    def toMsg(better: Boolean) = if (better) EnergyGained else EnergyLost
+
     Future {
-      val energyA = meetingEnergyUpdate(agentA.energy, agentB.energy)
-      val energyB = meetingEnergyUpdate(agentB.energy, agentA.energy)
-      (energyA, energyB)
+      val changeForA = toMsg { hasBetterFitness(agentA.fitness, agentB.fitness) }
+      val changeForB = toMsg { hasBetterFitness(agentB.fitness, agentA.fitness) }
+      (changeForA, changeForB)
     }.onComplete {
-      case Success((energyA, energyB)) =>
-        agentA.ref ! EnergyUpdate(energyA)
-        agentB.ref ! EnergyUpdate(energyB)
+      case Success((changeForA, changeForB)) =>
+        agentA.ref ! changeForA
+        agentB.ref ! changeForB
       case Failure(_) =>
-        agentA.ref ! EnergyUpdateFailed
-        agentB.ref ! EnergyUpdateFailed
+        agentA.ref ! MeetingFailed
+        agentB.ref ! MeetingFailed
     }
   }
 

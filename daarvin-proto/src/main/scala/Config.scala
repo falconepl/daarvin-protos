@@ -17,6 +17,11 @@ trait Config {
   def initGen: IndexedSeq[Int]
 
   /**
+   * Energy acquired/lost by the agent in a meeting with the other agent.
+   */
+  def meetingCost: Int
+
+  /**
    * Probability of agent performing a mutation after each message handling.
    */
   def mutateProbability: Double

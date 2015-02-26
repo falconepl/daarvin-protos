@@ -10,22 +10,29 @@ abstract class Agent(region: ActorRef, specificGen: Option[IndexedSeq[Int]] = No
 
   var gen = specificGen getOrElse initGen
 
+  var fitness = fitnessUpdate
+
   override def preStart() = controlled { talk }
 
   def receive = {
-    case EnergyUpdate(update) =>
-      energy = update
+    case EnergyGained =>
+      energy += meetingCost
+      controlled { tryMutate orElse talk }
+
+    case EnergyLost =>
+      energy -= meetingCost
+      controlled { tryMutate orElse talk }
+
+    case MeetingFailed =>
       controlled { tryMutate orElse talk }
 
     case GenUpdate(update) =>
       gen = update
+      fitness = fitnessUpdate
       controlled { talk }
 
     case CrossOverSucceeded =>
       energy = crossOverEnergyUpdate
-      controlled { tryMutate orElse talk }
-
-    case EnergyUpdateFailed =>
       controlled { tryMutate orElse talk }
 
     case CrossOverFailed =>
@@ -46,9 +53,9 @@ abstract class Agent(region: ActorRef, specificGen: Option[IndexedSeq[Int]] = No
 
   private def talk =
     crossOverProbability chanceFor {
-      context.parent ! CrossOverRequest
+      context.parent ! CrossOverRequest(gen)
     } orElse {
-      context.parent ! MeetingRequest
+      context.parent ! MeetingRequest(fitness)
     }
 
 }

@@ -14,10 +14,20 @@ trait Probability extends Any {
 
 object Probabilities {
 
+  import scala.language.implicitConversions
+
   private val r = new util.Random
 
   implicit final class ProbabilityDouble(private val n: Double) extends AnyVal with Probability {
     override def success = r.nextDouble() < n
   }
+
+  implicit def ProbabilityToBoolean(d: Draw): Boolean =
+    d match {
+      case Succeeded() => true
+      case Lost() => false
+    }
+
+  def drawnWithChance(p: Probability) = p chanceFor {}
 
 }
