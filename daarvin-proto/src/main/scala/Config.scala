@@ -1,3 +1,4 @@
+import scala.concurrent.duration.Duration
 
 trait Config {
 
@@ -31,5 +32,11 @@ trait Config {
    * m = probability of agent issuing a meeting with other agent.
    */
   def crossOverProbability: Double
+
+  /**
+   * Maximum time a region should wait for the next solution from one
+   * of its children.
+   */
+  def finishTimeout: Duration
 
 }

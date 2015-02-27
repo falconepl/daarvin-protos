@@ -3,7 +3,7 @@ import math.Probabilities._
 
 import scala.concurrent.Future
 
-abstract class Agent(region: ActorRef, specificGen: Option[IndexedSeq[Int]] = None)
+abstract class Agent(region: ActorRef, metricsHub: ActorRef, specificGen: Option[IndexedSeq[Int]] = None)
   extends Actor with Config with AgentBehavior {
 
   var energy = initEnergy
@@ -30,6 +30,7 @@ abstract class Agent(region: ActorRef, specificGen: Option[IndexedSeq[Int]] = No
       gen = update
       fitness = fitnessUpdate
       controlled { talk }
+      metricsHub ! MutateRecord
 
     case CrossOverSucceeded =>
       energy = crossOverEnergyUpdate
@@ -37,6 +38,10 @@ abstract class Agent(region: ActorRef, specificGen: Option[IndexedSeq[Int]] = No
 
     case CrossOverFailed =>
       controlled { tryMutate orElse talk }
+
+    case Finish =>
+      context.parent ! Solution(gen, fitness)
+      context stop self
   }
 
   private def controlled(action: => Unit) =

@@ -16,7 +16,7 @@ object Probabilities {
 
   import scala.language.implicitConversions
 
-  private val r = new util.Random
+  private val r = util.Random
 
   implicit final class ProbabilityDouble(private val n: Double) extends AnyVal with Probability {
     override def success = r.nextDouble() < n

@@ -1,5 +1,5 @@
-import akka.actor.Props
+import akka.actor.{ActorRef, Props}
 
 trait RequiresAgent {
-  def agentProps(gen: Option[IndexedSeq[Int]] = None): Props
+  def agentProps(region: ActorRef, metricsHub: ActorRef, gen: Option[IndexedSeq[Int]] = None): Props
 }

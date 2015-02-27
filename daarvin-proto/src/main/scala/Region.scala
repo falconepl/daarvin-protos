@@ -1,23 +1,62 @@
-import akka.actor.{Actor, ActorRef}
+import akka.actor.{Actor, ActorRef, ReceiveTimeout}
 
 import scala.concurrent.Future
+import scala.concurrent.duration.Duration
 import scala.reflect.ClassTag
 import scala.util.{Failure, Random, Success}
 
-abstract class Region extends Actor with Config with RegionBehavior with RequiresAgent {
+abstract class Region extends Actor with Config with RegionBehavior with RequiresMetrics with RequiresAgent {
 
   val children = collection.mutable.Map[ActorRef, AgentInfo]()
 
-  override def preStart() =
-    (1 to regionAgents).foreach { _ => context.actorOf(agentProps()) }
+  val metricsHub = context.actorOf(metricsProps)
+
+  (1 to regionAgents).foreach {
+    _ => context.actorOf(agentProps(sender, metricsHub))
+  }
+
+  var bestSolution = (IndexedSeq.empty[Int], 0)
+
+  var pendingSolutions: Option[Int] = None
+
+  var recipient: Option[ActorRef] = None
 
   def receive = {
+    case RegRecipient =>
+      recipient = Some(sender)
+
     case MeetingRequest(fitness) =>
       children += { (sender, MeetingInfo(sender, fitness)) }
       processPair (meetingAction)
+
     case CrossOverRequest(gen) =>
       children += { (sender, CrossOverInfo(sender, gen)) }
       processPair (crossOverAction)
+
+    case Finish =>
+      pendingSolutions = Some(context.children.size)
+      context.children.foreach { ch => ch ! Finish }
+      resetTimeout
+
+    case Solution(gen, fitness) =>
+      processSolution(gen, fitness)
+      pendingSolutions = pendingSolutions map (_ - 1)
+      pendingSolutions.map { pending =>
+        if (pending > 0)
+          resetTimeout
+        else {
+          timeoutOff
+          gatherMetrics
+        }
+      }
+
+    case ReceiveTimeout =>
+      timeoutOff
+      gatherMetrics
+
+    case Metrics(metricsData) =>
+      recipient.map { _ ! (bestSolution, metricsData) }
+      context stop self
   }
 
   private def processPair[AI <: AgentInfo : ClassTag](action: (AI, AI) => Unit) =
@@ -45,6 +84,8 @@ abstract class Region extends Actor with Config with RegionBehavior with Require
       case Success((changeForA, changeForB)) =>
         agentA.ref ! changeForA
         agentB.ref ! changeForB
+        metricsHub ! MeetingRecord
+
       case Failure(_) =>
         agentA.ref ! MeetingFailed
         agentB.ref ! MeetingFailed
@@ -56,15 +97,29 @@ abstract class Region extends Actor with Config with RegionBehavior with Require
 
     Future {
       val gen = crossOver(agentA.gen, agentB.gen)
-      context.actorOf(agentProps(Some(gen)))
+      context.actorOf(agentProps(sender, metricsHub, Some(gen)))
     }.onComplete {
       case Success(_) =>
         agentA.ref ! CrossOverSucceeded
         agentB.ref ! CrossOverSucceeded
+        metricsHub ! CrossOverRecord
+
       case Failure(_) =>
         agentA.ref ! CrossOverFailed
         agentB.ref ! CrossOverFailed
     }
   }
+
+  def processSolution(gen: IndexedSeq[Int], fitness: Int) = {
+    val (_, bestFit) = bestSolution
+    if (fitness > bestFit)
+      bestSolution = (gen, fitness)
+  }
+
+  private def resetTimeout = context.setReceiveTimeout(finishTimeout)
+
+  private def timeoutOff = context.setReceiveTimeout(Duration.Undefined)
+
+  private def gatherMetrics = metricsHub ! MetricsRequest
 
 }
