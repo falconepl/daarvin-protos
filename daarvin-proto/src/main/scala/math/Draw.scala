@@ -5,9 +5,9 @@ sealed trait Draw {
 }
 
 final case class Succeeded() extends Draw {
-  def orElse(action: => Unit): Unit = action
+  def orElse(action: => Unit): Unit = ()
 }
 
 final case class Lost() extends Draw {
-  def orElse(action: => Unit): Unit = ()
+  def orElse(action: => Unit): Unit = action
 }
