@@ -1,6 +1,12 @@
-import scala.concurrent.duration.Duration
+import scala.concurrent.duration.{FiniteDuration, Duration}
 
 trait Config {
+
+  /**
+   * Time for an actor system to operate. After that time a stop
+   * message is issued to halt the system and retrieve results.
+   */
+  def operatingTime: FiniteDuration
 
   /**
    * Number of agents for a single region.

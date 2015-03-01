@@ -42,3 +42,5 @@ case object MutateRecord extends RecordMessage
 case object MeetingRecord extends RecordMessage
 
 case object CrossOverRecord extends RecordMessage
+
+case object DeathRecord extends RecordMessage

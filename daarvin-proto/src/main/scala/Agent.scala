@@ -1,10 +1,11 @@
-import akka.actor.{Actor, ActorRef}
+import akka.actor.{Actor, ActorLogging, ActorRef}
 import math.Probabilities._
+import utils.LazyLog
 
 import scala.concurrent.Future
 
-abstract class Agent(region: ActorRef, metricsHub: ActorRef, specificGen: Option[IndexedSeq[Int]] = None)
-  extends Actor with Config with AgentBehavior {
+abstract class Agent(metricsHub: ActorRef, specificGen: Option[IndexedSeq[Int]] = None)
+  extends Actor with ActorLogging with LazyLog with Config with AgentBehavior {
 
   var energy = initEnergy
 
@@ -16,37 +17,44 @@ abstract class Agent(region: ActorRef, metricsHub: ActorRef, specificGen: Option
 
   def receive = {
     case EnergyGained =>
+      llog.debug("Energy gained")
       energy += meetingCost
       controlled { tryMutate orElse talk }
 
     case EnergyLost =>
+      llog.debug("Energy lost")
       energy -= meetingCost
       controlled { tryMutate orElse talk }
 
     case MeetingFailed =>
+      llog.debug("Meeting failed")
       controlled { tryMutate orElse talk }
 
     case GenUpdate(update) =>
+      llog.debug("Genetic update")
       gen = update
       fitness = fitnessUpdate
       controlled { talk }
       metricsHub ! MutateRecord
 
     case CrossOverSucceeded =>
+      llog.debug("Cross-over succeeded")
       energy = crossOverEnergyUpdate
       controlled { tryMutate orElse talk }
 
     case CrossOverFailed =>
+      llog.debug("Cross-over failed")
       controlled { tryMutate orElse talk }
 
     case Finish =>
+      llog.debug("Finish received")
       context.parent ! Solution(gen, fitness)
-      context stop self
+      die
   }
 
   private def controlled(action: => Unit) =
     if (aboveDeathThold) action
-    else context stop self
+    else die
 
   private def tryMutate = {
     import context.dispatcher
@@ -62,5 +70,10 @@ abstract class Agent(region: ActorRef, metricsHub: ActorRef, specificGen: Option
     } orElse {
       context.parent ! MeetingRequest(fitness)
     }
+
+  private def die = {
+    metricsHub ! DeathRecord
+    context stop self
+  }
 
 }

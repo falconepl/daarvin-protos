@@ -1,18 +1,24 @@
-import akka.actor.{Actor, ActorRef, ReceiveTimeout}
+import akka.actor.{Actor, ActorLogging, ActorRef, ReceiveTimeout}
+import utils.LazyLog
 
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
 import scala.reflect.ClassTag
 import scala.util.{Failure, Random, Success}
 
-abstract class Region extends Actor with Config with RegionBehavior with RequiresMetrics with RequiresAgent {
+abstract class Region
+  extends Actor with ActorLogging with LazyLog with Config
+  with RegionBehavior with RequiresMetrics with RequiresAgent {
+
+  import context.dispatcher
 
   val children = collection.mutable.Map[ActorRef, AgentInfo]()
 
-  val metricsHub = context.actorOf(metricsProps)
+  val metricsHub = context.actorOf(metricsProps, "metrics-hub")
+  val noOfMetricsHubs = 1
 
   (1 to regionAgents).foreach {
-    _ => context.actorOf(agentProps(sender, metricsHub))
+    num => context.actorOf(agentProps(metricsHub))
   }
 
   var bestSolution = (IndexedSeq.empty[Int], 0)
@@ -21,26 +27,37 @@ abstract class Region extends Actor with Config with RegionBehavior with Require
 
   var recipient: Option[ActorRef] = None
 
+  context.system.scheduler.scheduleOnce(operatingTime) {
+    llog.info("Region finish issued")
+    self ! Finish
+  }
+
+  llog.info("Starting region")
+
   def receive = {
     case RegRecipient =>
       recipient = Some(sender)
 
     case MeetingRequest(fitness) =>
+      llog.debug(s"Meeting request received from $sender")
       children += { (sender, MeetingInfo(sender, fitness)) }
       processPair (meetingAction)
 
     case CrossOverRequest(gen) =>
+      llog.debug(s"Cross-over request received from $sender")
       children += { (sender, CrossOverInfo(sender, gen)) }
       processPair (crossOverAction)
 
     case Finish =>
-      pendingSolutions = Some(context.children.size)
+      llog.debug("Finish received")
+      pendingSolutions = Some(context.children.size - noOfMetricsHubs)
       context.children.foreach { ch => ch ! Finish }
       resetTimeout
 
-    case Solution(gen, fitness) =>
+    case sol @ Solution(gen, fitness) =>
       processSolution(gen, fitness)
       pendingSolutions = pendingSolutions map (_ - 1)
+      llog.debug(s"Received solution $sol (${pendingSolutions.getOrElse(0)} pending)")
       pendingSolutions.map { pending =>
         if (pending > 0)
           resetTimeout
@@ -51,11 +68,13 @@ abstract class Region extends Actor with Config with RegionBehavior with Require
       }
 
     case ReceiveTimeout =>
+      llog.debug("Timeout received")
       timeoutOff
       gatherMetrics
 
-    case Metrics(metricsData) =>
-      recipient.map { _ ! (bestSolution, metricsData) }
+    case metrics: MetricsData =>
+      llog.debug("Sending best solution and metrics")
+      recipient.map { _ ! (bestSolution, metrics) }
       context stop self
   }
 
@@ -72,8 +91,6 @@ abstract class Region extends Actor with Config with RegionBehavior with Require
   }
 
   private def meetingAction(agentA: MeetingInfo, agentB: MeetingInfo) = {
-    import context.dispatcher
-
     def toMsg(better: Boolean) = if (better) EnergyGained else EnergyLost
 
     Future {
@@ -82,33 +99,34 @@ abstract class Region extends Actor with Config with RegionBehavior with Require
       (changeForA, changeForB)
     }.onComplete {
       case Success((changeForA, changeForB)) =>
+        llog.debug(s"Meeting succeeded: agents ${agentA.ref} and ${agentB.ref}")
         agentA.ref ! changeForA
         agentB.ref ! changeForB
         metricsHub ! MeetingRecord
 
       case Failure(_) =>
+        llog.debug(s"Meeting failed: agents ${agentA.ref} and ${agentB.ref}")
         agentA.ref ! MeetingFailed
         agentB.ref ! MeetingFailed
     }
   }
 
-  private def crossOverAction(agentA: CrossOverInfo, agentB: CrossOverInfo) = {
-    import context.dispatcher
-
+  private def crossOverAction(agentA: CrossOverInfo, agentB: CrossOverInfo) =
     Future {
       val gen = crossOver(agentA.gen, agentB.gen)
-      context.actorOf(agentProps(sender, metricsHub, Some(gen)))
+      context.actorOf(agentProps(metricsHub, Some(gen)))
     }.onComplete {
       case Success(_) =>
+        llog.debug(s"Cross-over succeeded: agents ${agentA.ref} and ${agentB.ref}")
         agentA.ref ! CrossOverSucceeded
         agentB.ref ! CrossOverSucceeded
         metricsHub ! CrossOverRecord
 
       case Failure(_) =>
+        llog.debug(s"Cross-over failed: agents ${agentA.ref} and ${agentB.ref}")
         agentA.ref ! CrossOverFailed
         agentB.ref ! CrossOverFailed
     }
-  }
 
   def processSolution(gen: IndexedSeq[Int], fitness: Int) = {
     val (_, bestFit) = bestSolution
