@@ -1,21 +1,21 @@
 
-trait AgentBehavior {
+trait AgentBehavior { _: AgentHallmarks =>
 
-  var gen: IndexedSeq[Int]
+  var gen: Gen
 
-  var energy: Int
+  var energy: Energy
 
-  var fitness: Int
+  var fitness: Fit
 
   /**
    * Energy value to set after cross-over action.
    */
-  def crossOverEnergyUpdate: Int
+  def crossOverEnergyUpdate: Energy
 
   /**
    * Current fitness value to set.
    */
-  def fitnessUpdate: Int
+  def fitnessUpdate: Fit
 
   /**
    * True if energy level is above a cross-over threshold. False otherwise.
@@ -30,6 +30,6 @@ trait AgentBehavior {
   /**
    * Genetic data to set after a mutation action.
    */
-  def mutate: IndexedSeq[Int]
+  def mutate: Gen
 
 }

@@ -1,8 +1,8 @@
 
-trait RegionBehavior extends Config {
+trait RegionBehavior { _: Config with WithGen with WithFit =>
 
-  def hasBetterFitness(selfFitness: Int, neighborFitness: Int): Boolean
+  def hasBetterFitness(selfFitness: Fit, neighborFitness: Fit): Boolean
 
-  def crossOver(genLeft: IndexedSeq[Int], genRight: IndexedSeq[Int]): IndexedSeq[Int]
+  def crossOver(genLeft: Gen, genRight: Gen): Gen
 
 }

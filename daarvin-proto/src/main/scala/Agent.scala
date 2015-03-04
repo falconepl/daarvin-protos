@@ -4,8 +4,10 @@ import utils.LazyLog
 
 import scala.concurrent.Future
 
-abstract class Agent(metricsHub: ActorRef, specificGen: Option[IndexedSeq[Int]] = None)
-  extends Actor with ActorLogging with LazyLog with Config with AgentBehavior {
+abstract class Agent[G](metricsHub: ActorRef, specificGen: Option[G] = None)
+  extends Actor with ActorLogging with LazyLog with Config with AgentBehavior with AgentHallmarks {
+
+  type Gen = G
 
   var energy = initEnergy
 
@@ -30,9 +32,9 @@ abstract class Agent(metricsHub: ActorRef, specificGen: Option[IndexedSeq[Int]] 
       llog.debug("Meeting failed")
       controlled { tryMutate orElse talk }
 
-    case GenUpdate(update) =>
+    case update: GenUpdate[G] =>
       llog.debug("Genetic update")
-      gen = update
+      gen = update.gen
       fitness = fitnessUpdate
       controlled { talk }
       metricsHub ! MutateRecord

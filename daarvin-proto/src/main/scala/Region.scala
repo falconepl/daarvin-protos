@@ -6,9 +6,13 @@ import scala.concurrent.duration.Duration
 import scala.reflect.ClassTag
 import scala.util.{Failure, Random, Success}
 
-abstract class Region
-  extends Actor with ActorLogging with LazyLog with Config
-  with RegionBehavior with RequiresMetrics with RequiresAgent {
+abstract class Region[G : ClassTag, E <: Expandable[E] with Contractive[E], F <: Ordered[F] : ClassTag]
+  extends Actor with ActorLogging with LazyLog with Config with RegionBehavior
+  with RequiresMetrics with RequiresAgent[G] with AgentHallmarks {
+
+  type Gen = G
+  type Energy = E
+  type Fit = F
 
   import context.dispatcher
 
@@ -21,7 +25,7 @@ abstract class Region
     num => context.actorOf(agentProps(metricsHub))
   }
 
-  var bestSolution = (IndexedSeq.empty[Int], 0)
+  var bestSolution: (Gen, Fit)
 
   var pendingSolutions: Option[Int] = None
 
@@ -38,14 +42,14 @@ abstract class Region
     case RegRecipient =>
       recipient = Some(sender)
 
-    case MeetingRequest(fitness) =>
+    case req: MeetingRequest[F] =>
       llog.debug(s"Meeting request received from $sender")
-      children += { (sender, MeetingInfo(sender, fitness)) }
+      children += { (sender, MeetingInfo(sender, req.fitness)) }
       processPair (meetingAction)
 
-    case CrossOverRequest(gen) =>
+    case req: CrossOverRequest[G] =>
       llog.debug(s"Cross-over request received from $sender")
-      children += { (sender, CrossOverInfo(sender, gen)) }
+      children += { (sender, CrossOverInfo(sender, req.gen)) }
       processPair (crossOverAction)
 
     case Finish =>
@@ -54,8 +58,8 @@ abstract class Region
       context.children.foreach { ch => ch ! Finish }
       resetTimeout
 
-    case sol @ Solution(gen, fitness) =>
-      processSolution(gen, fitness)
+    case sol: Solution[G, F] =>
+      processSolution(sol.gen, sol.fitness)
       pendingSolutions = pendingSolutions map (_ - 1)
       llog.debug(s"Received solution $sol (${pendingSolutions.getOrElse(0)} pending)")
       pendingSolutions.map { pending =>
@@ -90,7 +94,7 @@ abstract class Region
     if (draw.length == 2) Some((draw(0), draw(1))) else None
   }
 
-  private def meetingAction(agentA: MeetingInfo, agentB: MeetingInfo) = {
+  private def meetingAction(agentA: MeetingInfo[Fit], agentB: MeetingInfo[Fit]) = {
     def toMsg(better: Boolean) = if (better) EnergyGained else EnergyLost
 
     Future {
@@ -111,7 +115,7 @@ abstract class Region
     }
   }
 
-  private def crossOverAction(agentA: CrossOverInfo, agentB: CrossOverInfo) =
+  private def crossOverAction(agentA: CrossOverInfo[Gen], agentB: CrossOverInfo[Gen]) =
     Future {
       val gen = crossOver(agentA.gen, agentB.gen)
       context.actorOf(agentProps(metricsHub, Some(gen)))
@@ -128,7 +132,7 @@ abstract class Region
         agentB.ref ! CrossOverFailed
     }
 
-  def processSolution(gen: IndexedSeq[Int], fitness: Int) = {
+  def processSolution(gen: Gen, fitness: Fit) = {
     val (_, bestFit) = bestSolution
     if (fitness > bestFit)
       bestSolution = (gen, fitness)

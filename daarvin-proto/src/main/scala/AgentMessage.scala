@@ -5,7 +5,7 @@ sealed trait AgentMessage
 case object RegRecipient extends AgentMessage
 
 
-case class MeetingRequest(fitness: Int) extends AgentMessage
+case class MeetingRequest[F <: Ordered[F]](fitness: F) extends AgentMessage
 
 sealed trait EnergyChange extends AgentMessage
 
@@ -16,9 +16,9 @@ case object EnergyLost extends EnergyChange
 case object MeetingFailed extends AgentMessage
 
 
-case class CrossOverRequest(gen: IndexedSeq[Int]) extends AgentMessage
+case class CrossOverRequest[G](gen: G) extends AgentMessage
 
-case class GenUpdate(gen: IndexedSeq[Int]) extends AgentMessage
+case class GenUpdate[G](gen: G) extends AgentMessage
 
 case object CrossOverSucceeded extends AgentMessage
 
@@ -27,7 +27,7 @@ case object CrossOverFailed extends AgentMessage
 
 case object Finish extends AgentMessage
 
-case class Solution(gen: IndexedSeq[Int], fitness: Int) extends AgentMessage
+case class Solution[G, F <: Ordered[F]](gen: G, fitness: F) extends AgentMessage
 
 
 case object MetricsRequest extends AgentMessage

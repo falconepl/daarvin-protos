@@ -1,6 +1,6 @@
-import scala.concurrent.duration.{FiniteDuration, Duration}
+import scala.concurrent.duration.{Duration, FiniteDuration}
 
-trait Config {
+trait Config { _: WithGen with WithEnergy =>
 
   /**
    * Time for an actor system to operate. After that time a stop
@@ -16,17 +16,17 @@ trait Config {
   /**
    * Agent's initial energy level.
    */
-  def initEnergy: Int
+  def initEnergy: Energy
 
   /**
    * Agent's initial genetic data.
    */
-  def initGen: IndexedSeq[Int]
+  def initGen: Gen
 
   /**
    * Energy acquired/lost by the agent in a meeting with the other agent.
    */
-  def meetingCost: Int
+  def meetingCost: Energy
 
   /**
    * Probability of agent performing a mutation after each message handling.
