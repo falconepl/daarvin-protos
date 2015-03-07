@@ -1,6 +1,6 @@
 import scala.concurrent.duration.{Duration, FiniteDuration}
 
-trait Config { _: WithGen with WithEnergy =>
+trait Config { _: Hallmarks =>
 
   /**
    * Time for an actor system to operate. After that time a stop

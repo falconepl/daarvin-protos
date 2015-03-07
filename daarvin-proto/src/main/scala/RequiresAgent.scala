@@ -1,5 +1,5 @@
 import akka.actor.{ActorRef, Props}
 
-trait RequiresAgent[G] {
-  def agentProps(metricsHub: ActorRef, gen: Option[G] = None): Props
+trait RequiresAgent { _: Hallmarks =>
+  def agentProps(metricsHub: ActorRef, gen: Option[Gen] = None): Props
 }

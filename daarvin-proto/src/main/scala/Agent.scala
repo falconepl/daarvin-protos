@@ -5,7 +5,7 @@ import utils.LazyLog
 import scala.concurrent.Future
 
 abstract class Agent[G](metricsHub: ActorRef, specificGen: Option[G] = None)
-  extends Actor with ActorLogging with LazyLog with Config with AgentBehavior with AgentHallmarks {
+  extends Actor with ActorLogging with LazyLog with Config with AgentBehavior with Hallmarks {
 
   type Gen = G
 
@@ -20,12 +20,12 @@ abstract class Agent[G](metricsHub: ActorRef, specificGen: Option[G] = None)
   def receive = {
     case EnergyGained =>
       llog.debug("Energy gained")
-      energy += meetingCost
+      energy = energy + meetingCost
       controlled { tryMutate orElse talk }
 
     case EnergyLost =>
       llog.debug("Energy lost")
-      energy -= meetingCost
+      energy = energy - meetingCost
       controlled { tryMutate orElse talk }
 
     case MeetingFailed =>

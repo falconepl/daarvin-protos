@@ -6,9 +6,9 @@ import scala.concurrent.duration.Duration
 import scala.reflect.ClassTag
 import scala.util.{Failure, Random, Success}
 
-abstract class Region[G : ClassTag, E <: Expandable[E] with Contractive[E], F <: Ordered[F] : ClassTag]
+abstract class Region[G : ClassTag, E <: Changeable[E], F <: Ordered[F] : ClassTag]
   extends Actor with ActorLogging with LazyLog with Config with RegionBehavior
-  with RequiresMetrics with RequiresAgent[G] with AgentHallmarks {
+  with RequiresMetrics with RequiresAgent with Hallmarks {
 
   type Gen = G
   type Energy = E

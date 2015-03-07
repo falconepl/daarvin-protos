@@ -1,5 +1,5 @@
 
-trait AgentBehavior { _: AgentHallmarks =>
+trait AgentBehavior { _: Hallmarks =>
 
   var gen: Gen
 

@@ -1,5 +1,5 @@
 
-trait RegionBehavior { _: Config with WithGen with WithFit =>
+trait RegionBehavior { _: Hallmarks =>
 
   def hasBetterFitness(selfFitness: Fit, neighborFitness: Fit): Boolean
 
