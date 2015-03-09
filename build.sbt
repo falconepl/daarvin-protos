@@ -3,7 +3,7 @@ version in LocalRootProject := "0.1-SNAPSHOT"
 
 lazy val commonSettings = Seq(
   organization := "pl.falcone",
-  scalaVersion := "2.11.5"
+  scalaVersion := "2.11.6"
 )
 
 val akka = "com.typesafe.akka" %% "akka-actor" % "2.3.9"
