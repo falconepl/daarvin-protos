@@ -6,14 +6,24 @@ lazy val commonSettings = Seq(
   scalaVersion := "2.11.5"
 )
 
+val akka = "com.typesafe.akka" %% "akka-actor" % "2.3.9"
+
 lazy val daarvinProto = (project in file("daarvin-proto")).
   settings(commonSettings: _*).
   settings(
     name := "daarvin-proto",
     version := "0.1-SNAPSHOT",
-    libraryDependencies ++= Seq(
-      "com.typesafe.akka" %% "akka-actor" % "2.3.9"
-    )
+    libraryDependencies ++= Seq(akka)
+  )
+
+lazy val simpleAgents = (project in file("simple-agents")).
+  settings(commonSettings: _*).
+  settings(
+    name := "simple-agents",
+    version := "0.1-SNAPSHOT",
+    libraryDependencies ++= Seq(akka)
+  ).dependsOn(
+    daarvinProto
   )
 
 lazy val golombRule = (project in file("golomb-rule")).
